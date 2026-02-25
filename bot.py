@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import uuid
+import base64
+import tempfile
 from datetime import datetime
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -87,7 +89,17 @@ MONTH_NAME_TO_NUM = {v.lower(): k for k, v in MONTHS_MAPPING.items()}
 
 # Inicjalizacja klientów
 client_ai = OpenAI(api_key=OPENAI_API_KEY)
-gc = gspread.service_account(filename="credentials.json")
+
+# Google Sheets — obsługa Railway (env var) i lokalnego pliku
+_creds_b64 = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
+if _creds_b64:
+    _creds_json = base64.b64decode(_creds_b64).decode("utf-8")
+    _tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    _tmp.write(_creds_json)
+    _tmp.close()
+    gc = gspread.service_account(filename=_tmp.name)
+else:
+    gc = gspread.service_account(filename="credentials.json")
 
 # Logowanie
 logging.basicConfig(
