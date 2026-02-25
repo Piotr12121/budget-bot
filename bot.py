@@ -93,7 +93,7 @@ client_ai = OpenAI(api_key=OPENAI_API_KEY)
 # Google Sheets — obsługa Railway (env var) i lokalnego pliku
 _creds_b64 = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
 if _creds_b64:
-    _creds_json = base64.b64decode(_creds_b64).decode("utf-8")
+    _creds_json = base64.b64decode(_creds_b64 + "==").decode("utf-8")
     _tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
     _tmp.write(_creds_json)
     _tmp.close()
