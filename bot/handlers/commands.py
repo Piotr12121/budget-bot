@@ -125,7 +125,7 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @authorized
 async def undo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    saved = storage.last_saved.get(user_id)
+    saved = storage.get_last_saved(user_id)
 
     if not saved:
         await context.bot.send_message(
@@ -141,7 +141,7 @@ async def undo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         sheets.delete_rows(saved["row_indices"])
         n = len(saved["row_indices"])
-        del storage.last_saved[user_id]
+        storage.delete_last_saved(user_id)
 
         if n == 1:
             await context.bot.send_message(

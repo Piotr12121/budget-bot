@@ -24,13 +24,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     expense_id = value
-    pending = storage.pending_expenses.pop(expense_id, None)
+    pending = storage.pop_pending(expense_id)
     if pending is None:
         await query.edit_message_text(t("expense_expired"))
         return
 
     if query.from_user.id != pending["user_id"]:
-        storage.pending_expenses[expense_id] = pending
+        storage.save_pending(expense_id, pending)
         await query.answer(t("not_your_expense"), show_alert=True)
         return
 
@@ -44,10 +44,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pending["expenses"], pending["original_text"]
             )
 
-            storage.last_saved[pending["user_id"]] = {
+            storage.save_last_saved(pending["user_id"], {
                 "row_indices": row_indices,
                 "expenses": pending["expenses"],
-            }
+            })
 
             result_text = build_save_confirmation(pending["expenses"])
             await query.edit_message_text(result_text)

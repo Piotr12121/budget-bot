@@ -33,11 +33,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         expense_id = str(uuid.uuid4())
-        storage.pending_expenses[expense_id] = {
+        storage.save_pending(expense_id, {
             "user_id": update.effective_user.id,
             "expenses": data,
             "original_text": user_text,
-        }
+        })
 
         preview = build_preview_text(data)
         keyboard = InlineKeyboardMarkup([

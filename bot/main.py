@@ -9,6 +9,7 @@ from telegram.ext import (
 )
 from bot.config import TELEGRAM_TOKEN
 from bot.handlers import commands, messages, callbacks
+from bot.services import storage
 
 
 def create_app():
@@ -28,8 +29,14 @@ def create_app():
     return application
 
 
+async def cleanup_expired_pending(context):
+    storage.cleanup_expired()
+
+
 def main():
     app = create_app()
+    # Run cleanup every 30 minutes
+    app.job_queue.run_repeating(cleanup_expired_pending, interval=1800, first=60)
     print("Bot wystartował...")
     app.run_polling()
 
