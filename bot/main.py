@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 from bot.config import TELEGRAM_TOKEN
 from bot.handlers import commands, messages, callbacks
-from bot.services import storage
+from bot.services import storage, database
 
 
 def create_app():
@@ -34,6 +34,13 @@ async def cleanup_expired_pending(context):
 
 
 def main():
+    # Initialize PostgreSQL if configured
+    if database.is_available():
+        database.init_db()
+        print("PostgreSQL connected and initialized.")
+    else:
+        print("PostgreSQL not configured — running in Sheets-only mode.")
+
     app = create_app()
     # Run cleanup every 30 minutes
     app.job_queue.run_repeating(cleanup_expired_pending, interval=1800, first=60)

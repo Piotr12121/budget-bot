@@ -14,6 +14,7 @@ SPREADSHEET_NAME = os.environ["SPREADSHEET_NAME"]
 SHEET_TAB_NAME = os.environ["SHEET_TAB_NAME"]
 ALLOWED_USER_ID = int(os.environ["ALLOWED_USER_ID"])
 USER_LANGUAGE = os.environ.get("USER_LANGUAGE", "pl")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 MONTHS_MAPPING = {
     1: "Styczeń", 2: "Luty", 3: "Marzec", 4: "Kwiecień",
