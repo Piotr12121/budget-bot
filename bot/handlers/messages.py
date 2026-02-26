@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 from bot.services import ai_parser, storage
 from bot.utils.auth import authorized
 from bot.utils.formatting import build_preview_text
+from bot.i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +27,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not data:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=(
-                    "🤔 Nie rozpoznałem wydatku w Twojej wiadomości.\n\n"
-                    "Spróbuj np.:\n"
-                    "• `50 zł biedronka zakupy`\n"
-                    "• `tankowanie orlen 250`\n"
-                    "• `biedronka 80, apteka 35`\n\n"
-                    "Wpisz /help aby zobaczyć pomoc."
-                ),
+                text=t("no_expense_found"),
                 parse_mode="Markdown",
             )
             return
@@ -48,8 +42,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         preview = build_preview_text(data)
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("✅ Zapisz", callback_data=f"confirm:{expense_id}"),
-                InlineKeyboardButton("❌ Anuluj", callback_data=f"cancel:{expense_id}"),
+                InlineKeyboardButton(t("btn_save"), callback_data=f"confirm:{expense_id}"),
+                InlineKeyboardButton(t("btn_cancel"), callback_data=f"cancel:{expense_id}"),
             ]
         ])
 
@@ -63,15 +57,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except json.JSONDecodeError:
         await context.bot.send_message(
             chat_id=chat_id,
-            text=(
-                "🤔 Nie udało mi się zrozumieć wydatku.\n\n"
-                "Spróbuj wpisać kwotę i opis, np.: `50 zł biedronka zakupy`"
-            ),
+            text=t("parse_error"),
             parse_mode="Markdown",
         )
     except Exception as e:
         logger.error(f"Error in handle_message: {e}")
         await context.bot.send_message(
             chat_id=chat_id,
-            text="❌ Wystąpił błąd podczas przetwarzania. Spróbuj ponownie.",
+            text=t("general_error"),
         )

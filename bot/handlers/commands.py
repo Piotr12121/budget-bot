@@ -1,14 +1,15 @@
-"""Bot command handlers: /start, /help, /categories, /summary, /undo."""
+"""Bot command handlers: /start, /help, /categories, /summary, /undo, /lang."""
 
 import logging
 from datetime import datetime
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 from bot.config import MONTHS_MAPPING, MONTH_NAME_TO_NUM
 from bot.categories import CATEGORIES_DISPLAY
 from bot.services import sheets, storage
 from bot.utils.auth import authorized
+from bot.i18n import t, set_lang
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=(
-            f"👋 Cześć! Twoje ID to: `{user_id}`.\n\n"
-            f"Wpisz je w pliku `.env` jako `ALLOWED_USER_ID`, aby autoryzować bota.\n\n"
-            f"Wpisz /help aby zobaczyć dostępne komendy."
-        ),
+        text=t("start_greeting", user_id=user_id),
         parse_mode="Markdown",
     )
 
@@ -30,21 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=(
-            "📖 *Jak używać bota?*\n\n"
-            "Wyślij wiadomość z wydatkiem, np.:\n"
-            "• `50 zł biedronka zakupy`\n"
-            "• `tankowanie orlen 250`\n"
-            "• `wczoraj netflix 45`\n"
-            "• `biedronka 80, apteka 35, siłownia 120`\n\n"
-            "Bot rozpozna kwotę, datę i kategorię, a potem poprosi o potwierdzenie.\n\n"
-            "*Komendy:*\n"
-            "/help — ta wiadomość\n"
-            "/categories — lista kategorii\n"
-            "/summary — podsumowanie bieżącego miesiąca\n"
-            "/summary _nazwa miesiąca_ — podsumowanie konkretnego miesiąca\n"
-            "/undo — cofnij ostatni zapisany wydatek\n"
-        ),
+        text=t("help_text"),
         parse_mode="Markdown",
     )
 
@@ -71,7 +54,7 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if target_month is None:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="❌ Nie rozpoznałem nazwy miesiąca. Spróbuj np. `/summary styczeń`.",
+                text=t("month_not_recognized"),
                 parse_mode="Markdown",
             )
             return
@@ -110,13 +93,13 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not totals:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"📊 Brak wydatków za: *{target_month}*.",
+                text=t("summary_no_data", month=target_month),
                 parse_mode="Markdown",
             )
             return
 
         grand_total = sum(totals.values())
-        lines = [f"📊 *Podsumowanie: {target_month}*\n"]
+        lines = [t("summary_title", month=target_month) + "\n"]
         for cat in sorted(totals, key=lambda c: totals[c], reverse=True):
             lines.append(f"  • {cat}: *{totals[cat]:.2f} PLN*")
             if cat in sub_totals:
@@ -124,7 +107,7 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     sub_totals[cat], key=lambda s: sub_totals[cat][s], reverse=True
                 ):
                     lines.append(f"      ◦ {sub}: {sub_totals[cat][sub]:.2f} PLN")
-        lines.append(f"\n💰 *Razem: {grand_total:.2f} PLN* ({count} wpisów)")
+        lines.append(f"\n{t('summary_total', total=grand_total, count=count)}")
 
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -135,7 +118,7 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(e)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="❌ Nie udało się pobrać podsumowania. Spróbuj ponownie później.",
+            text=t("summary_error"),
         )
 
 
@@ -147,7 +130,7 @@ async def undo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not saved:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="🤷 Nie ma czego cofać — brak ostatniego wpisu w pamięci.",
+            text=t("nothing_to_undo"),
         )
         return
 
@@ -160,13 +143,35 @@ async def undo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         n = len(saved["row_indices"])
         del storage.last_saved[user_id]
 
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"↩️ Cofnięto {'ostatni wpis' if n == 1 else f'ostatnie {n} wpisy'}.",
-        )
+        if n == 1:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=t("undo_single"),
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=t("undo_multi", n=n),
+            )
     except Exception as e:
         logger.error(e)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="❌ Nie udało się cofnąć wpisu. Spróbuj ponownie.",
+            text=t("undo_error"),
         )
+
+
+@authorized
+async def lang_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show language selection keyboard."""
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🇵🇱 Polski", callback_data="lang:pl"),
+            InlineKeyboardButton("🇬🇧 English", callback_data="lang:en"),
+        ]
+    ])
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=t("lang_prompt"),
+        reply_markup=keyboard,
+    )

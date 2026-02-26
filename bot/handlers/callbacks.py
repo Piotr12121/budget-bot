@@ -1,10 +1,11 @@
-"""Callback query handler for confirm/cancel buttons."""
+"""Callback query handler for confirm/cancel/lang buttons."""
 
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.services import sheets, storage
 from bot.utils.formatting import build_save_confirmation
+from bot.i18n import t, set_lang
 
 logger = logging.getLogger(__name__)
 
@@ -14,20 +15,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     callback_data = query.data
-    action, expense_id = callback_data.split(":", 1)
+    action, value = callback_data.split(":", 1)
 
+    # Language switch
+    if action == "lang":
+        set_lang(value)
+        await query.edit_message_text(t("lang_switched"), parse_mode="Markdown")
+        return
+
+    expense_id = value
     pending = storage.pending_expenses.pop(expense_id, None)
     if pending is None:
-        await query.edit_message_text("⚠️ Ten wydatek już został przetworzony lub wygasł.")
+        await query.edit_message_text(t("expense_expired"))
         return
 
     if query.from_user.id != pending["user_id"]:
         storage.pending_expenses[expense_id] = pending
-        await query.answer("🔒 To nie Twój wydatek.", show_alert=True)
+        await query.answer(t("not_your_expense"), show_alert=True)
         return
 
     if action == "cancel":
-        await query.edit_message_text("❌ Anulowano — nic nie zostało zapisane.")
+        await query.edit_message_text(t("cancelled"))
         return
 
     if action == "confirm":
@@ -46,6 +54,4 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             logger.error(f"Error saving expenses: {e}")
-            await query.edit_message_text(
-                "❌ Błąd podczas zapisywania do arkusza. Spróbuj ponownie."
-            )
+            await query.edit_message_text(t("save_error"))

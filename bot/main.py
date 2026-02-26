@@ -19,6 +19,7 @@ def create_app():
     application.add_handler(CommandHandler("categories", commands.categories_cmd))
     application.add_handler(CommandHandler("summary", commands.summary_cmd))
     application.add_handler(CommandHandler("undo", commands.undo_cmd))
+    application.add_handler(CommandHandler("lang", commands.lang_cmd))
     application.add_handler(
         MessageHandler(filters.TEXT & (~filters.COMMAND), messages.handle_message)
     )
