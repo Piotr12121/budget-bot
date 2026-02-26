@@ -14,14 +14,28 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.environ.get("STATE_DB_PATH", "state.db")
 PENDING_TTL_SECONDS = 3600  # 1 hour
 
+_conn_cache: sqlite3.Connection | None = None
+
 
 def _get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+    global _conn_cache
+    # For in-memory DBs, reuse the same connection (new connection = new empty DB)
+    if DB_PATH == ":memory:":
+        if _conn_cache is None:
+            _conn_cache = sqlite3.connect(":memory:")
+        return _conn_cache
+    return sqlite3.connect(DB_PATH)
+
+
+def _close_conn(conn: sqlite3.Connection) -> None:
+    """Close connection unless it's a cached in-memory connection."""
+    if conn is not _conn_cache:
+        conn.close()
 
 
 def _init_db():
+    global _conn_cache
+    _conn_cache = None  # Reset cached connection
     conn = _get_conn()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS pending_expenses (
@@ -36,7 +50,9 @@ def _init_db():
             created_at REAL NOT NULL
         );
     """)
-    conn.close()
+    if DB_PATH != ":memory:":
+        conn.execute("PRAGMA journal_mode=WAL")
+    _close_conn(conn)
 
 
 _init_db()
@@ -51,7 +67,7 @@ def save_pending(expense_id: str, data: dict) -> None:
         (expense_id, data["user_id"], json.dumps(data), time.time()),
     )
     conn.commit()
-    conn.close()
+    _close_conn(conn)
 
 
 def get_pending(expense_id: str) -> dict | None:
@@ -60,7 +76,7 @@ def get_pending(expense_id: str) -> dict | None:
         "SELECT data_json FROM pending_expenses WHERE expense_id = ?",
         (expense_id,),
     ).fetchone()
-    conn.close()
+    _close_conn(conn)
     if row is None:
         return None
     return json.loads(row[0])
@@ -70,7 +86,7 @@ def delete_pending(expense_id: str) -> None:
     conn = _get_conn()
     conn.execute("DELETE FROM pending_expenses WHERE expense_id = ?", (expense_id,))
     conn.commit()
-    conn.close()
+    _close_conn(conn)
 
 
 def pop_pending(expense_id: str) -> dict | None:
@@ -90,7 +106,7 @@ def save_last_saved(user_id: int, data: dict) -> None:
         (user_id, json.dumps(data), time.time()),
     )
     conn.commit()
-    conn.close()
+    _close_conn(conn)
 
 
 def get_last_saved(user_id: int) -> dict | None:
@@ -99,7 +115,7 @@ def get_last_saved(user_id: int) -> dict | None:
         "SELECT data_json FROM last_saved WHERE user_id = ?",
         (user_id,),
     ).fetchone()
-    conn.close()
+    _close_conn(conn)
     if row is None:
         return None
     return json.loads(row[0])
@@ -109,7 +125,7 @@ def delete_last_saved(user_id: int) -> None:
     conn = _get_conn()
     conn.execute("DELETE FROM last_saved WHERE user_id = ?", (user_id,))
     conn.commit()
-    conn.close()
+    _close_conn(conn)
 
 
 # --- Cleanup ---
@@ -121,12 +137,7 @@ def cleanup_expired() -> int:
     cursor = conn.execute("DELETE FROM pending_expenses WHERE created_at < ?", (cutoff,))
     count = cursor.rowcount
     conn.commit()
-    conn.close()
+    _close_conn(conn)
     if count > 0:
         logger.info(f"Cleaned up {count} expired pending expenses")
     return count
-
-
-# Backward compatibility - dict-like access for transition period
-pending_expenses: dict[str, dict] = {}  # unused, kept for import compatibility
-last_saved: dict[int, dict] = {}  # unused, kept for import compatibility
