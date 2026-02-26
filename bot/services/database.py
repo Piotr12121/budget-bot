@@ -24,7 +24,8 @@ def is_available() -> bool:
         return False
     try:
         conn = _get_conn()
-        conn.execute("SELECT 1")
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
         _release_conn(conn)
         return True
     except Exception as e:
@@ -40,7 +41,8 @@ def _get_conn():
     if _pool:
         conn = _pool.pop()
         try:
-            conn.execute("SELECT 1")
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
             return conn
         except Exception:
             try:
