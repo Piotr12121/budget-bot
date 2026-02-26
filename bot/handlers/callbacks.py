@@ -1,14 +1,45 @@
 """Callback query handler for confirm/cancel/edit/lang buttons."""
 
 import logging
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from bot.services import sheets, storage
+from bot.services import sheets, storage, database
 from bot.utils.formatting import build_preview_text, build_save_confirmation
 from bot.categories import CATEGORIES, CATEGORY_NAMES, CATEGORY_EMOJIS
+from bot.config import MONTHS_MAPPING
 from bot.i18n import t, set_lang
 
 logger = logging.getLogger(__name__)
+
+
+def _check_budgets(user_db_id: int, expenses: list[dict]) -> list[str]:
+    """Check if any budgets are close to or exceeded. Returns warning strings."""
+    warnings = []
+    try:
+        budgets = database.get_budgets(user_db_id)
+        if not budgets:
+            return warnings
+
+        # Determine month from first expense
+        expense_date = datetime.strptime(expenses[0]["date"], "%Y-%m-%d")
+        month_name = MONTHS_MAPPING[expense_date.month]
+
+        for budget in budgets:
+            cat = budget["category"]
+            limit_val = float(budget["monthly_limit"])
+            usage = database.get_budget_usage(user_db_id, cat, month_name)
+            pct = (usage / limit_val * 100) if limit_val > 0 else 0
+
+            display_cat = cat if cat else t("budget_total_label")
+            if pct >= 100:
+                warnings.append(t("budget_exceeded", category=display_cat, used=f"{usage:.0f}", limit=f"{limit_val:.0f}"))
+            elif pct >= 80:
+                warnings.append(t("budget_warning", category=display_cat, pct=f"{pct:.0f}", used=f"{usage:.0f}", limit=f"{limit_val:.0f}"))
+    except Exception as e:
+        logger.warning(f"Budget check failed: {e}")
+
+    return warnings
 
 
 def _build_confirmation_keyboard(expense_id: str, num_expenses: int) -> InlineKeyboardMarkup:
@@ -175,17 +206,46 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "confirm":
         try:
-            row_indices = sheets.save_expenses_to_sheet(
-                pending["expenses"], pending["original_text"]
-            )
+            if database.is_available():
+                user_db_id = database.get_or_create_user(
+                    pending["user_id"],
+                    query.from_user.full_name,
+                )
+                expense_ids = database.save_expenses(
+                    user_db_id, pending["expenses"], pending["original_text"]
+                )
+                storage.save_last_saved(pending["user_id"], {
+                    "expense_ids": expense_ids,
+                    "expenses": pending["expenses"],
+                })
 
-            storage.save_last_saved(pending["user_id"], {
-                "row_indices": row_indices,
-                "expenses": pending["expenses"],
-            })
+                # Sync to Sheets in background (best-effort)
+                try:
+                    row_indices = sheets.save_expenses_to_sheet(
+                        pending["expenses"], pending["original_text"]
+                    )
+                    for eid, ridx in zip(expense_ids, row_indices):
+                        database.mark_synced(eid, ridx)
+                except Exception:
+                    logger.warning("Sheets sync failed, will retry later")
 
-            result_text = build_save_confirmation(pending["expenses"])
-            await query.edit_message_text(result_text)
+                # Check budgets and warn
+                budget_warnings = _check_budgets(user_db_id, pending["expenses"])
+                result_text = build_save_confirmation(pending["expenses"])
+                if budget_warnings:
+                    result_text += "\n\n" + "\n".join(budget_warnings)
+                await query.edit_message_text(result_text)
+            else:
+                # Fallback: Sheets-only mode
+                row_indices = sheets.save_expenses_to_sheet(
+                    pending["expenses"], pending["original_text"]
+                )
+                storage.save_last_saved(pending["user_id"], {
+                    "row_indices": row_indices,
+                    "expenses": pending["expenses"],
+                })
+                result_text = build_save_confirmation(pending["expenses"])
+                await query.edit_message_text(result_text)
 
         except Exception as e:
             logger.error(f"Error saving expenses: {e}")

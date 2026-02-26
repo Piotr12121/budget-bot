@@ -7,7 +7,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 from bot.config import MONTHS_MAPPING, MONTH_NAME_TO_NUM
 from bot.categories import CATEGORIES_DISPLAY
-from bot.services import sheets, storage
+from bot.services import sheets, storage, database
 from bot.utils.auth import authorized
 from bot.i18n import t, set_lang
 
@@ -66,29 +66,45 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        all_rows = sheets.get_all_rows()
-
         totals: dict[str, float] = {}
         sub_totals: dict[str, dict[str, float]] = {}
         count = 0
-        for row in all_rows:
-            if len(row) < 7:
-                continue
-            if row[6].strip() == target_month:
-                try:
-                    amount = float(row[1].replace(",", "."))
-                    category = row[2]
-                    totals[category] = totals.get(category, 0) + amount
-                    subcategory = row[3] if len(row) > 3 else ""
-                    if subcategory:
-                        if category not in sub_totals:
-                            sub_totals[category] = {}
-                        sub_totals[category][subcategory] = (
-                            sub_totals[category].get(subcategory, 0) + amount
-                        )
-                    count += 1
-                except (ValueError, IndexError):
+
+        if database.is_available():
+            user_db_id = database.get_or_create_user(update.effective_user.id)
+            rows = database.get_expenses_by_month(user_db_id, target_month)
+            for row in rows:
+                amount = float(row["amount"])
+                category = row["category"]
+                totals[category] = totals.get(category, 0) + amount
+                subcategory = row["subcategory"]
+                if subcategory:
+                    if category not in sub_totals:
+                        sub_totals[category] = {}
+                    sub_totals[category][subcategory] = (
+                        sub_totals[category].get(subcategory, 0) + amount
+                    )
+                count += 1
+        else:
+            all_rows = sheets.get_all_rows()
+            for row in all_rows:
+                if len(row) < 7:
                     continue
+                if row[6].strip() == target_month:
+                    try:
+                        amount = float(row[1].replace(",", "."))
+                        category = row[2]
+                        totals[category] = totals.get(category, 0) + amount
+                        subcategory = row[3] if len(row) > 3 else ""
+                        if subcategory:
+                            if category not in sub_totals:
+                                sub_totals[category] = {}
+                            sub_totals[category][subcategory] = (
+                                sub_totals[category].get(subcategory, 0) + amount
+                            )
+                        count += 1
+                    except (ValueError, IndexError):
+                        continue
 
         if not totals:
             await context.bot.send_message(
@@ -139,8 +155,28 @@ async def undo_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        sheets.delete_rows(saved["row_indices"])
-        n = len(saved["row_indices"])
+        expense_ids = saved.get("expense_ids")
+        row_indices = saved.get("row_indices")
+
+        if expense_ids and database.is_available():
+            database.delete_expenses(expense_ids)
+            n = len(expense_ids)
+            # Also try to delete from Sheets if we have row indices
+            if row_indices:
+                try:
+                    sheets.delete_rows(row_indices)
+                except Exception:
+                    logger.warning("Sheets undo failed, rows may remain in sheet")
+        elif row_indices:
+            sheets.delete_rows(row_indices)
+            n = len(row_indices)
+        else:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=t("undo_error"),
+            )
+            return
+
         storage.delete_last_saved(user_id)
 
         if n == 1:

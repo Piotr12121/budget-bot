@@ -76,4 +76,59 @@ STRINGS = {
     # Language
     "lang_switched": "🇬🇧 Language changed to: *English*",
     "lang_prompt": "🌐 Wybierz język / Choose language:",
+
+    # Budgets
+    "budget_total_label": "Total",
+    "budget_warning": "⚠️ You've used {pct}% of your *{category}* budget ({used}/{limit} PLN)",
+    "budget_exceeded": "🚨 Budget exceeded for *{category}*! ({used}/{limit} PLN)",
+    "budget_set": "✅ Budget set: *{category}* — {limit} PLN/month",
+    "budget_removed": "🗑️ Budget removed: *{category}*",
+    "budget_not_found": "❌ No budget found for: *{category}*",
+    "budget_list_title": "📊 *Budgets for {month}:*\n",
+    "budget_no_budgets": "📊 No budgets set.\n\nUse `/budget <category> <amount>` to set one.",
+    "budget_usage": "Usage: `/budget jedzenie 2000`\n`/budget total 8000` — total budget\n`/budget remove jedzenie` — remove",
+
+    # Charts
+    "chart_no_data": "📊 No data for chart in: *{month}*.",
+    "chart_pie_title": "Expenses: {month}",
+    "chart_bar_title": "Monthly comparison",
+    "chart_error": "❌ Chart generation error.",
+
+    # Recurring
+    "recurring_added": "🔄 Added recurring expense: *{description}* — {amount} PLN ({frequency})",
+    "recurring_removed": "🗑️ Removed recurring expense #{id}",
+    "recurring_not_found": "❌ Recurring expense #{id} not found",
+    "recurring_list_title": "🔄 *Recurring expenses:*\n",
+    "recurring_no_items": "🔄 No recurring expenses.\n\nUse `/recurring add <amount> <description> <frequency>` to add.",
+    "recurring_created": "🔄 Auto-created recurring expense: *{description}* — {amount} PLN",
+    "recurring_usage": "Usage:\n`/recurring add 120 gym monthly`\n`/recurring list` — show list\n`/recurring remove <id>` — remove",
+    "recurring_freq_daily": "daily",
+    "recurring_freq_weekly": "weekly",
+    "recurring_freq_monthly": "monthly",
+
+    # Income
+    "income_saved": "💵 Income saved: *{amount} PLN* — {source}",
+    "income_error": "❌ Error saving income.",
+    "balance_title": "💰 *Balance: {month}*\n",
+    "balance_income": "💵 Income: *{income:.2f} PLN*",
+    "balance_expenses": "💸 Expenses: *{expenses:.2f} PLN*",
+    "balance_net": "📊 Net: *{net:.2f} PLN*",
+    "balance_no_data": "💰 No data for: *{month}*.",
+
+    # Search
+    "search_title": "🔍 *Results for \"{query}\":*\n",
+    "search_no_results": "🔍 No results for: *{query}*",
+    "search_usage": "Usage: `/search <query>`",
+    "last_title": "📋 *Last {n} expenses:*\n",
+    "last_no_data": "📋 No expenses.",
+    "expenses_title": "📋 *Expenses {start} — {end}:*\n",
+    "expenses_no_data": "📋 No expenses in the given period.",
+    "expenses_usage": "Usage: `/expenses 2026-02-01 2026-02-28`",
+
+    # Export
+    "export_no_data": "📋 No expenses to export for: *{month}*.",
+    "export_error": "❌ Export error.",
+
+    # DB required
+    "db_required": "⚠️ This feature requires a database connection.",
 }

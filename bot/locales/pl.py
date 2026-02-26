@@ -76,4 +76,59 @@ STRINGS = {
     # Language
     "lang_switched": "🇵🇱 Język zmieniony na: *Polski*",
     "lang_prompt": "🌐 Wybierz język / Choose language:",
+
+    # Budgets
+    "budget_total_label": "Łącznie",
+    "budget_warning": "⚠️ Wykorzystano {pct}% budżetu na *{category}* ({used}/{limit} PLN)",
+    "budget_exceeded": "🚨 Przekroczono budżet na *{category}*! ({used}/{limit} PLN)",
+    "budget_set": "✅ Ustawiono budżet: *{category}* — {limit} PLN/miesiąc",
+    "budget_removed": "🗑️ Usunięto budżet: *{category}*",
+    "budget_not_found": "❌ Nie znaleziono budżetu dla: *{category}*",
+    "budget_list_title": "📊 *Budżety na {month}:*\n",
+    "budget_no_budgets": "📊 Nie ustawiono żadnych budżetów.\n\nUżyj `/budget <kategoria> <kwota>` aby ustawić.",
+    "budget_usage": "Użycie: `/budget jedzenie 2000`\n`/budget total 8000` — budżet łączny\n`/budget remove jedzenie` — usuń",
+
+    # Charts
+    "chart_no_data": "📊 Brak danych do wygenerowania wykresu za: *{month}*.",
+    "chart_pie_title": "Wydatki: {month}",
+    "chart_bar_title": "Porównanie miesięcy",
+    "chart_error": "❌ Błąd generowania wykresu.",
+
+    # Recurring
+    "recurring_added": "🔄 Dodano wydatek cykliczny: *{description}* — {amount} PLN ({frequency})",
+    "recurring_removed": "🗑️ Usunięto wydatek cykliczny #{id}",
+    "recurring_not_found": "❌ Nie znaleziono wydatku cyklicznego #{id}",
+    "recurring_list_title": "🔄 *Wydatki cykliczne:*\n",
+    "recurring_no_items": "🔄 Brak wydatków cyklicznych.\n\nUżyj `/recurring add <kwota> <opis> <częstotliwość>` aby dodać.",
+    "recurring_created": "🔄 Automatycznie dodano wydatek cykliczny: *{description}* — {amount} PLN",
+    "recurring_usage": "Użycie:\n`/recurring add 120 siłownia miesięcznie`\n`/recurring list` — pokaż listę\n`/recurring remove <id>` — usuń",
+    "recurring_freq_daily": "codziennie",
+    "recurring_freq_weekly": "co tydzień",
+    "recurring_freq_monthly": "co miesiąc",
+
+    # Income
+    "income_saved": "💵 Zapisano przychód: *{amount} PLN* — {source}",
+    "income_error": "❌ Błąd zapisywania przychodu.",
+    "balance_title": "💰 *Bilans: {month}*\n",
+    "balance_income": "💵 Przychody: *{income:.2f} PLN*",
+    "balance_expenses": "💸 Wydatki: *{expenses:.2f} PLN*",
+    "balance_net": "📊 Bilans: *{net:.2f} PLN*",
+    "balance_no_data": "💰 Brak danych za: *{month}*.",
+
+    # Search
+    "search_title": "🔍 *Wyniki dla \"{query}\":*\n",
+    "search_no_results": "🔍 Brak wyników dla: *{query}*",
+    "search_usage": "Użycie: `/search <fraza>`",
+    "last_title": "📋 *Ostatnie {n} wydatków:*\n",
+    "last_no_data": "📋 Brak wydatków.",
+    "expenses_title": "📋 *Wydatki {start} — {end}:*\n",
+    "expenses_no_data": "📋 Brak wydatków w podanym okresie.",
+    "expenses_usage": "Użycie: `/expenses 2026-02-01 2026-02-28`",
+
+    # Export
+    "export_no_data": "📋 Brak wydatków do eksportu za: *{month}*.",
+    "export_error": "❌ Błąd eksportu.",
+
+    # DB required
+    "db_required": "⚠️ Ta funkcja wymaga połączenia z bazą danych.",
 }
