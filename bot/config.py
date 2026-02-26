@@ -8,7 +8,7 @@ from openai import OpenAI
 
 load_dotenv()
 
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 SPREADSHEET_NAME = os.environ["SPREADSHEET_NAME"]
 SHEET_TAB_NAME = os.environ["SHEET_TAB_NAME"]
