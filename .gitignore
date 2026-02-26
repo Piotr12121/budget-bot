@@ -2,4 +2,6 @@
 credentials.json
 venv/
 __pycache__/
+state.db
 DEPLOY.md
+PROGRESS.md

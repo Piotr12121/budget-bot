@@ -1,5 +1,8 @@
-python-telegram-bot
+python-telegram-bot[job-queue]
 openai
 gspread
 google-auth
 python-dotenv
+pydantic
+psycopg2-binary
+matplotlib

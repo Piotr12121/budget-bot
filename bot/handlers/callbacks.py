@@ -1,0 +1,252 @@
+"""Callback query handler for confirm/cancel/edit/lang buttons."""
+
+import logging
+from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+from bot.services import sheets, storage, database
+from bot.utils.formatting import build_preview_text, build_save_confirmation
+from bot.categories import CATEGORIES, CATEGORY_NAMES, CATEGORY_EMOJIS
+from bot.config import MONTHS_MAPPING
+from bot.i18n import t, set_lang
+
+logger = logging.getLogger(__name__)
+
+
+def _check_budgets(user_db_id: int, expenses: list[dict]) -> list[str]:
+    """Check if any budgets are close to or exceeded. Returns warning strings."""
+    warnings = []
+    try:
+        budgets = database.get_budgets(user_db_id)
+        if not budgets:
+            return warnings
+
+        # Determine month from first expense
+        expense_date = datetime.strptime(expenses[0]["date"], "%Y-%m-%d")
+        month_name = MONTHS_MAPPING[expense_date.month]
+
+        for budget in budgets:
+            cat = budget["category"]
+            limit_val = float(budget["monthly_limit"])
+            usage = database.get_budget_usage(user_db_id, cat, month_name)
+            pct = (usage / limit_val * 100) if limit_val > 0 else 0
+
+            display_cat = cat if cat else t("budget_total_label")
+            if pct >= 100:
+                warnings.append(t("budget_exceeded", category=display_cat, used=f"{usage:.0f}", limit=f"{limit_val:.0f}"))
+            elif pct >= 80:
+                warnings.append(t("budget_warning", category=display_cat, pct=f"{pct:.0f}", used=f"{usage:.0f}", limit=f"{limit_val:.0f}"))
+    except Exception as e:
+        logger.warning(f"Budget check failed: {e}")
+
+    return warnings
+
+
+def _build_confirmation_keyboard(expense_id: str, num_expenses: int) -> InlineKeyboardMarkup:
+    """Build the confirmation keyboard with edit/save/cancel buttons."""
+    rows = []
+    if num_expenses == 1:
+        rows.append([
+            InlineKeyboardButton(t("btn_edit"), callback_data=f"edit:{expense_id}:0"),
+        ])
+    else:
+        # Per-item edit buttons for batch expenses
+        edit_buttons = []
+        for i in range(num_expenses):
+            edit_buttons.append(
+                InlineKeyboardButton(f"✏️ #{i+1}", callback_data=f"edit:{expense_id}:{i}")
+            )
+            if len(edit_buttons) == 3:
+                rows.append(edit_buttons)
+                edit_buttons = []
+        if edit_buttons:
+            rows.append(edit_buttons)
+
+    rows.append([
+        InlineKeyboardButton(t("btn_save"), callback_data=f"confirm:{expense_id}"),
+        InlineKeyboardButton(t("btn_cancel"), callback_data=f"cancel:{expense_id}"),
+    ])
+    return InlineKeyboardMarkup(rows)
+
+
+def _build_category_keyboard(expense_id: str, item_idx: int) -> InlineKeyboardMarkup:
+    """Build keyboard with all main categories."""
+    rows = []
+    for i, cat_name in enumerate(CATEGORY_NAMES):
+        emoji = CATEGORY_EMOJIS.get(cat_name, "📂")
+        rows.append([
+            InlineKeyboardButton(
+                f"{emoji} {cat_name}",
+                callback_data=f"cat:{expense_id}:{item_idx}:{i}",
+            )
+        ])
+    rows.append([
+        InlineKeyboardButton("⬅️ " + t("btn_back"), callback_data=f"back:{expense_id}"),
+    ])
+    return InlineKeyboardMarkup(rows)
+
+
+def _build_subcategory_keyboard(
+    expense_id: str, item_idx: int, cat_idx: int
+) -> InlineKeyboardMarkup:
+    """Build keyboard with subcategories for a given category."""
+    cat_name = CATEGORY_NAMES[cat_idx]
+    subcategories = CATEGORIES[cat_name]
+    rows = []
+    for j, sub_name in enumerate(subcategories):
+        rows.append([
+            InlineKeyboardButton(
+                sub_name,
+                callback_data=f"sub:{expense_id}:{item_idx}:{cat_idx}:{j}",
+            )
+        ])
+    rows.append([
+        InlineKeyboardButton(
+            "⬅️ " + t("btn_back"),
+            callback_data=f"edit:{expense_id}:{item_idx}",
+        ),
+    ])
+    return InlineKeyboardMarkup(rows)
+
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    parts = callback_data.split(":")
+    action = parts[0]
+
+    # Language switch
+    if action == "lang":
+        set_lang(parts[1])
+        await query.edit_message_text(t("lang_switched"), parse_mode="Markdown")
+        return
+
+    # Extract expense_id (always parts[1] for expense actions)
+    expense_id = parts[1]
+
+    # For edit/cat/sub/back, we need to peek at the pending expense without removing it
+    if action in ("edit", "cat", "sub", "back"):
+        pending = storage.get_pending(expense_id)
+        if pending is None:
+            await query.edit_message_text(t("expense_expired"))
+            return
+        if query.from_user.id != pending["user_id"]:
+            await query.answer(t("not_your_expense"), show_alert=True)
+            return
+
+    if action == "edit":
+        # Show category selection for the given item
+        item_idx = int(parts[2])
+        keyboard = _build_category_keyboard(expense_id, item_idx)
+        current = pending["expenses"][item_idx]
+        text = (
+            f"✏️ *{t('edit_category_prompt')}*\n\n"
+            f"📝 {current['description']} — *{current['amount']} PLN*\n"
+            f"📂 {current['category']} > {current['subcategory']}"
+        )
+        await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        return
+
+    if action == "cat":
+        # Show subcategories for selected category
+        item_idx = int(parts[2])
+        cat_idx = int(parts[3])
+        cat_name = CATEGORY_NAMES[cat_idx]
+        keyboard = _build_subcategory_keyboard(expense_id, item_idx, cat_idx)
+        emoji = CATEGORY_EMOJIS.get(cat_name, "📂")
+        text = f"✏️ {emoji} *{cat_name}*\n\n{t('edit_subcategory_prompt')}"
+        await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        return
+
+    if action == "sub":
+        # Apply the selected category/subcategory and return to preview
+        item_idx = int(parts[2])
+        cat_idx = int(parts[3])
+        sub_idx = int(parts[4])
+
+        cat_name = CATEGORY_NAMES[cat_idx]
+        sub_name = CATEGORIES[cat_name][sub_idx]
+
+        pending["expenses"][item_idx]["category"] = cat_name
+        pending["expenses"][item_idx]["subcategory"] = sub_name
+        storage.save_pending(expense_id, pending)
+
+        preview = build_preview_text(pending["expenses"])
+        keyboard = _build_confirmation_keyboard(expense_id, len(pending["expenses"]))
+        await query.edit_message_text(preview, reply_markup=keyboard, parse_mode="Markdown")
+        return
+
+    if action == "back":
+        # Return to preview
+        pending = storage.get_pending(expense_id)
+        if pending is None:
+            await query.edit_message_text(t("expense_expired"))
+            return
+        preview = build_preview_text(pending["expenses"])
+        keyboard = _build_confirmation_keyboard(expense_id, len(pending["expenses"]))
+        await query.edit_message_text(preview, reply_markup=keyboard, parse_mode="Markdown")
+        return
+
+    # For confirm/cancel, pop the pending expense
+    pending = storage.pop_pending(expense_id)
+    if pending is None:
+        await query.edit_message_text(t("expense_expired"))
+        return
+
+    if query.from_user.id != pending["user_id"]:
+        storage.save_pending(expense_id, pending)
+        await query.answer(t("not_your_expense"), show_alert=True)
+        return
+
+    if action == "cancel":
+        await query.edit_message_text(t("cancelled"))
+        return
+
+    if action == "confirm":
+        try:
+            if database.is_available():
+                user_db_id = database.get_or_create_user(
+                    pending["user_id"],
+                    query.from_user.full_name,
+                )
+                expense_ids = database.save_expenses(
+                    user_db_id, pending["expenses"], pending["original_text"]
+                )
+                storage.save_last_saved(pending["user_id"], {
+                    "expense_ids": expense_ids,
+                    "expenses": pending["expenses"],
+                })
+
+                # Sync to Sheets in background (best-effort)
+                try:
+                    row_indices = sheets.save_expenses_to_sheet(
+                        pending["expenses"], pending["original_text"]
+                    )
+                    for eid, ridx in zip(expense_ids, row_indices):
+                        database.mark_synced(eid, ridx)
+                except Exception:
+                    logger.warning("Sheets sync failed, will retry later")
+
+                # Check budgets and warn
+                budget_warnings = _check_budgets(user_db_id, pending["expenses"])
+                result_text = build_save_confirmation(pending["expenses"])
+                if budget_warnings:
+                    result_text += "\n\n" + "\n".join(budget_warnings)
+                await query.edit_message_text(result_text)
+            else:
+                # Fallback: Sheets-only mode
+                row_indices = sheets.save_expenses_to_sheet(
+                    pending["expenses"], pending["original_text"]
+                )
+                storage.save_last_saved(pending["user_id"], {
+                    "row_indices": row_indices,
+                    "expenses": pending["expenses"],
+                })
+                result_text = build_save_confirmation(pending["expenses"])
+                await query.edit_message_text(result_text)
+
+        except Exception as e:
+            logger.error(f"Error saving expenses: {e}")
+            await query.edit_message_text(t("save_error"))
