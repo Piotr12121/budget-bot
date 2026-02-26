@@ -253,6 +253,7 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Filter by month name (column index 6 = 7th column)
         totals: dict[str, float] = {}
+        sub_totals: dict[str, dict[str, float]] = {}
         count = 0
         for row in all_rows:
             if len(row) < 7:
@@ -262,6 +263,11 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     amount = float(row[1].replace(",", "."))
                     category = row[2]
                     totals[category] = totals.get(category, 0) + amount
+                    subcategory = row[3] if len(row) > 3 else ""
+                    if subcategory:
+                        if category not in sub_totals:
+                            sub_totals[category] = {}
+                        sub_totals[category][subcategory] = sub_totals[category].get(subcategory, 0) + amount
                     count += 1
                 except (ValueError, IndexError):
                     continue
@@ -278,6 +284,9 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines = [f"📊 *Podsumowanie: {target_month}*\n"]
         for cat in sorted(totals, key=lambda c: totals[c], reverse=True):
             lines.append(f"  • {cat}: *{totals[cat]:.2f} PLN*")
+            if cat in sub_totals:
+                for sub in sorted(sub_totals[cat], key=lambda s: sub_totals[cat][s], reverse=True):
+                    lines.append(f"      ◦ {sub}: {sub_totals[cat][sub]:.2f} PLN")
         lines.append(f"\n💰 *Razem: {grand_total:.2f} PLN* ({count} wpisów)")
 
         await context.bot.send_message(
