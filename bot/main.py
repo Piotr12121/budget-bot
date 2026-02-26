@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 from bot.config import TELEGRAM_TOKEN
 from bot.handlers import commands, messages, callbacks
-from bot.services import storage, database
+from bot.services import storage, database, sync
 
 
 def create_app():
@@ -33,6 +33,14 @@ async def cleanup_expired_pending(context):
     storage.cleanup_expired()
 
 
+async def sync_sheets_job(context):
+    """Periodic job to sync unsynced expenses to Google Sheets."""
+    try:
+        sync.sync_unsynced_to_sheets()
+    except Exception:
+        pass
+
+
 def main():
     # Initialize PostgreSQL if configured
     if database.is_available():
@@ -44,6 +52,9 @@ def main():
     app = create_app()
     # Run cleanup every 30 minutes
     app.job_queue.run_repeating(cleanup_expired_pending, interval=1800, first=60)
+    # Sync unsynced expenses to Sheets every 5 minutes (if DB available)
+    if database.is_available():
+        app.job_queue.run_repeating(sync_sheets_job, interval=300, first=120)
     print("Bot wystartował...")
     app.run_polling()
 
