@@ -68,6 +68,11 @@ STRINGS = {
     "undo_multi": "↩️ Last {n} entries undone.",
     "undo_error": "❌ Failed to undo entry. Please try again.",
 
+    # Edit
+    "btn_back": "Back",
+    "edit_category_prompt": "Choose a category:",
+    "edit_subcategory_prompt": "Choose a subcategory:",
+
     # Language
     "lang_switched": "🇬🇧 Language changed to: *English*",
     "lang_prompt": "🌐 Wybierz język / Choose language:",

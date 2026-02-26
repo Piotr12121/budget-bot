@@ -3,12 +3,13 @@
 import json
 import logging
 import uuid
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 from bot.services import ai_parser, storage
 from bot.utils.auth import authorized
 from bot.utils.formatting import build_preview_text
+from bot.handlers.callbacks import _build_confirmation_keyboard
 from bot.i18n import t
 
 logger = logging.getLogger(__name__)
@@ -40,12 +41,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         })
 
         preview = build_preview_text(data)
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(t("btn_save"), callback_data=f"confirm:{expense_id}"),
-                InlineKeyboardButton(t("btn_cancel"), callback_data=f"cancel:{expense_id}"),
-            ]
-        ])
+        keyboard = _build_confirmation_keyboard(expense_id, len(data))
 
         await context.bot.send_message(
             chat_id=chat_id,

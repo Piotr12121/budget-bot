@@ -68,6 +68,11 @@ STRINGS = {
     "undo_multi": "↩️ Cofnięto ostatnie {n} wpisy.",
     "undo_error": "❌ Nie udało się cofnąć wpisu. Spróbuj ponownie.",
 
+    # Edit
+    "btn_back": "Wróć",
+    "edit_category_prompt": "Wybierz kategorię:",
+    "edit_subcategory_prompt": "Wybierz podkategorię:",
+
     # Language
     "lang_switched": "🇵🇱 Język zmieniony na: *Polski*",
     "lang_prompt": "🌐 Wybierz język / Choose language:",
