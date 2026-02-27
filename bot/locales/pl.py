@@ -32,7 +32,8 @@ STRINGS = {
         "/last `[N]` — ostatnie N wydatków (domyślnie: 10)\n"
         "/expenses `<start> <koniec>` — wydatki w zakresie dat\n"
         "/export `[miesiąc]` — eksport CSV\n"
-        "/lang — zmień język"
+        "/lang — zmień język\n"
+        "/importsheets — importuj wydatki z arkusza do bazy"
     ),
 
     # Auth

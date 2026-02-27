@@ -32,7 +32,8 @@ STRINGS = {
         "/last `[N]` — last N expenses (default: 10)\n"
         "/expenses `<start> <end>` — expenses by date range\n"
         "/export `[month]` — CSV export\n"
-        "/lang — change language"
+        "/lang — change language\n"
+        "/importsheets — import expenses from Sheets to DB"
     ),
 
     # Auth
