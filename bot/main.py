@@ -30,6 +30,7 @@ def create_app():
     application.add_handler(CommandHandler("last", commands.last_cmd))
     application.add_handler(CommandHandler("expenses", commands.expenses_cmd))
     application.add_handler(CommandHandler("export", commands.export_cmd))
+    application.add_handler(CommandHandler("importsheets", commands.import_sheets_cmd))
     application.add_handler(
         MessageHandler(filters.TEXT & (~filters.COMMAND), messages.handle_message)
     )

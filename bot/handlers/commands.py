@@ -713,3 +713,66 @@ async def export_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         document=output.getvalue().encode("utf-8"),
         filename=f"wydatki_{target_month}.csv",
     )
+
+
+# --- Import from Sheets ---
+
+@authorized
+async def import_sheets_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Import all expenses from Google Sheets into the database: /importsheets."""
+    if not database.is_available():
+        await update.message.reply_text(t("db_required"))
+        return
+
+    await context.bot.send_chat_action(
+        chat_id=update.effective_chat.id, action=ChatAction.TYPING
+    )
+
+    user_db_id = database.get_or_create_user(update.effective_user.id)
+
+    try:
+        all_rows = sheets.get_all_rows()
+    except Exception as e:
+        logger.error(f"Import error: {e}")
+        await update.message.reply_text(t("general_error"))
+        return
+
+    # Skip header row if present
+    data_rows = all_rows
+    if data_rows and data_rows[0][0].lower() in ("date", "data"):
+        data_rows = data_rows[1:]
+
+    imported = 0
+    skipped = 0
+    for row in data_rows:
+        if len(row) < 5:
+            skipped += 1
+            continue
+        try:
+            date_str = row[0].strip()
+            amount = float(row[1].replace("\xa0", "").replace(" ", "").replace(",", "."))
+            category = row[2].strip()
+            subcategory = row[3].strip() if len(row) > 3 else ""
+            description = row[4].strip() if len(row) > 4 else ""
+            original_text = row[5].strip() if len(row) > 5 else ""
+
+            datetime.strptime(date_str, "%Y-%m-%d")
+
+            expense_dict = {
+                "amount": amount,
+                "date": date_str,
+                "category": category,
+                "subcategory": subcategory,
+                "description": description,
+            }
+            database.save_expense(user_db_id, expense_dict, original_text)
+            imported += 1
+        except (ValueError, IndexError):
+            skipped += 1
+            continue
+
+    await update.message.reply_text(
+        f"✅ Zaimportowano *{imported}* wydatków z arkusza.\n"
+        f"⏭️ Pominięto: {skipped} wierszy.",
+        parse_mode="Markdown",
+    )
