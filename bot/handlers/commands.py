@@ -94,7 +94,7 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     continue
                 if row[6].strip() == target_month:
                     try:
-                        amount = float(row[1].replace(",", "."))
+                        amount = float(row[1].replace("\xa0", "").replace(" ", "").replace(",", "."))
                         category = row[2]
                         totals[category] = totals.get(category, 0) + amount
                         subcategory = row[3] if len(row) > 3 else ""
