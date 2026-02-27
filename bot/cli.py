@@ -698,6 +698,58 @@ def cmd_sync(args):
     return 0
 
 
+def cmd_import_sheets(args):
+    """Import all expenses from Google Sheets into the database."""
+    _require_db()
+    from bot.services import database, sheets
+    from bot.config import ALLOWED_USER_ID
+
+    user_db_id = database.get_or_create_user(ALLOWED_USER_ID)
+
+    print("Fetching rows from Google Sheets...")
+    all_rows = sheets.get_all_rows()
+
+    # Skip header row if present
+    data_rows = all_rows
+    if data_rows and data_rows[0][0].lower() in ("date", "data"):
+        data_rows = data_rows[1:]
+
+    imported = 0
+    skipped = 0
+    for row in data_rows:
+        if len(row) < 5:
+            skipped += 1
+            continue
+        try:
+            date_str = row[0].strip()
+            amount = float(row[1].replace("\xa0", "").replace(" ", "").replace(",", "."))
+            category = row[2].strip()
+            subcategory = row[3].strip() if len(row) > 3 else ""
+            description = row[4].strip() if len(row) > 4 else ""
+            original_text = row[5].strip() if len(row) > 5 else ""
+
+            # Validate date
+            datetime.strptime(date_str, "%Y-%m-%d")
+
+            expense_dict = {
+                "amount": amount,
+                "date": date_str,
+                "category": category,
+                "subcategory": subcategory,
+                "description": description,
+            }
+            database.save_expense(user_db_id, expense_dict, original_text)
+            imported += 1
+        except (ValueError, IndexError) as e:
+            skipped += 1
+            if args.verbose:
+                print(f"  Skipped row: {row[:3]}... ({e})")
+            continue
+
+    print(f"Imported {imported} expenses into database. Skipped {skipped} rows.")
+    return 0
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 
@@ -807,6 +859,10 @@ def build_parser() -> argparse.ArgumentParser:
     # sync
     sub.add_parser("sync", help="Sync unsynced expenses to Google Sheets")
 
+    # import-sheets
+    p = sub.add_parser("import-sheets", help="Import expenses from Google Sheets into DB")
+    p.add_argument("-v", "--verbose", action="store_true", help="Show skipped rows")
+
     return parser
 
 
@@ -828,6 +884,7 @@ COMMAND_MAP = {
     "undo": cmd_undo,
     "lang": cmd_lang,
     "sync": cmd_sync,
+    "import-sheets": cmd_import_sheets,
 }
 
 
