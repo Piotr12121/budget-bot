@@ -288,7 +288,15 @@ railway run budzet dashboard
 railway run budzet --json summary | jq '.categories'
 ```
 
-Opcja B jest wygodniejsza — nie wymaga pliku `.env`, zawsze używa produkcyjnych danych.
+> **Uwaga:** `railway run` wstrzykuje wewnętrzny adres bazy (`postgres.railway.internal`), który działa tylko w sieci Railway. Z zewnątrz potrzebujesz publicznego URL — pobierz go raz i dodaj do `.env`:
+>
+> ```bash
+> railway variables --service Postgres --json \
+>   | python3 -c "import sys,json; d=json.load(sys.stdin); print('DATABASE_URL=' + d['DATABASE_PUBLIC_URL'])" \
+>   >> .env
+> ```
+>
+> Po tym `venv/bin/budzet dashboard` działa bezpośrednio bez żadnego prefixu.
 
 ## Kategorie
 
