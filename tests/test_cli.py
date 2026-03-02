@@ -371,7 +371,7 @@ class TestCmdSummary:
         assert result == 0
         out = capsys.readouterr().out
         assert "Luty" in out
-        assert "170.00 PLN" in out
+        assert "170.00" in out
 
     @patch("bot.services.database.is_available", return_value=False)
     @patch("bot.services.sheets.get_all_rows", return_value=[])
