@@ -81,3 +81,24 @@ def build_categories_display() -> str:
 
 CATEGORIES_CONTEXT = build_categories_context()
 CATEGORIES_DISPLAY = build_categories_display()
+
+
+INCOME_CATEGORIES = [
+    "Wynagrodzenie",
+    "Wynajem mieszkania",
+    "Premia",
+    "Przychody z premii bankowych",
+    "Odsetki bankowe",
+    "Sprzedaż na Allegro itp.",
+    "Inne przychody",
+]
+
+INCOME_CATEGORY_EMOJIS = {
+    "Wynagrodzenie": "💼",
+    "Wynajem mieszkania": "🏠",
+    "Premia": "🎯",
+    "Przychody z premii bankowych": "🏦",
+    "Odsetki bankowe": "📈",
+    "Sprzedaż na Allegro itp.": "🛒",
+    "Inne przychody": "💰",
+}

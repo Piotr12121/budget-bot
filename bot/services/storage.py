@@ -49,6 +49,12 @@ def _init_db():
             data_json TEXT NOT NULL,
             created_at REAL NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS pending_income (
+            income_id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            data_json TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
     """)
     if DB_PATH != ":memory:":
         conn.execute("PRAGMA journal_mode=WAL")
@@ -126,6 +132,46 @@ def delete_last_saved(user_id: int) -> None:
     conn.execute("DELETE FROM last_saved WHERE user_id = ?", (user_id,))
     conn.commit()
     _close_conn(conn)
+
+
+# --- Pending Income ---
+
+def save_pending_income(income_id: str, data: dict) -> None:
+    conn = _get_conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO pending_income (income_id, user_id, data_json, created_at) VALUES (?, ?, ?, ?)",
+        (income_id, data["user_id"], json.dumps(data), time.time()),
+    )
+    conn.commit()
+    _close_conn(conn)
+
+
+def get_pending_income(income_id: str) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT data_json FROM pending_income WHERE income_id = ?",
+        (income_id,),
+    ).fetchone()
+    _close_conn(conn)
+    if row is None:
+        return None
+    return json.loads(row[0])
+
+
+def pop_pending_income(income_id: str) -> dict | None:
+    """Get and delete a pending income atomically."""
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT data_json FROM pending_income WHERE income_id = ?",
+        (income_id,),
+    ).fetchone()
+    if row is None:
+        _close_conn(conn)
+        return None
+    conn.execute("DELETE FROM pending_income WHERE income_id = ?", (income_id,))
+    conn.commit()
+    _close_conn(conn)
+    return json.loads(row[0])
 
 
 # --- Cleanup ---

@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from bot.config import gc, SPREADSHEET_NAME, SHEET_TAB_NAME, MONTHS_MAPPING
+from bot.config import gc, SPREADSHEET_NAME, SHEET_TAB_NAME, INCOME_SHEET_TAB_NAME, MONTHS_MAPPING
 
 logger = logging.getLogger(__name__)
 
@@ -48,3 +48,35 @@ def get_all_rows() -> list[list[str]]:
     sh = gc.open(SPREADSHEET_NAME)
     worksheet = sh.worksheet(SHEET_TAB_NAME)
     return worksheet.get_all_values()
+
+
+def _ensure_income_worksheet(sh):
+    """Return the income worksheet, creating it with headers if it doesn't exist."""
+    try:
+        return sh.worksheet(INCOME_SHEET_TAB_NAME)
+    except Exception:
+        ws = sh.add_worksheet(title=INCOME_SHEET_TAB_NAME, rows=1000, cols=6)
+        ws.append_row(["data", "kwota", "kategoria", "opis", "miesiac", "dzien"],
+                      value_input_option="USER_ENTERED")
+        return ws
+
+
+def save_income_to_sheet(income_data: dict) -> None:
+    """Append an income entry to the income sheet."""
+    sh = gc.open(SPREADSHEET_NAME)
+    worksheet = _ensure_income_worksheet(sh)
+
+    income_date_obj = datetime.strptime(income_data["date"], "%Y-%m-%d")
+    month_name = MONTHS_MAPPING[income_date_obj.month]
+    day_number = income_date_obj.day
+    amount_str = str(income_data["amount"]).replace(".", ",")
+
+    row = [
+        income_data["date"],
+        amount_str,
+        income_data.get("category", ""),
+        income_data.get("source", ""),
+        month_name,
+        day_number,
+    ]
+    worksheet.append_row(row, value_input_option="USER_ENTERED")

@@ -15,6 +15,7 @@ SHEET_TAB_NAME = os.environ["SHEET_TAB_NAME"]
 ALLOWED_USER_ID = int(os.environ["ALLOWED_USER_ID"])
 USER_LANGUAGE = os.environ.get("USER_LANGUAGE", "pl")
 DATABASE_URL = os.environ.get("DATABASE_URL")
+INCOME_SHEET_TAB_NAME = os.environ.get("INCOME_SHEET_TAB_NAME", "Bot_Przychody")
 
 MONTHS_MAPPING = {
     1: "Styczeń", 2: "Luty", 3: "Marzec", 4: "Kwiecień",

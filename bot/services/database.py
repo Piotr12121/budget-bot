@@ -433,13 +433,13 @@ def update_next_due(recurring_id: int, next_due: date):
 
 # --- Income ---
 
-def save_income(user_id: int, amount: float, source: str, date_str: str, description: str | None = None) -> int:
+def save_income(user_id: int, amount: float, source: str, date_str: str, description: str | None = None, category: str | None = None) -> int:
     """Save an income entry. Returns income ID."""
     row = _execute(
-        """INSERT INTO income (user_id, amount, source, date, description)
-           VALUES (%s, %s, %s, %s, %s)
+        """INSERT INTO income (user_id, amount, source, date, description, category)
+           VALUES (%s, %s, %s, %s, %s, %s)
            RETURNING id""",
-        (user_id, amount, source, date_str, description),
+        (user_id, amount, source, date_str, description, category),
         returning=True,
     )
     return row[0]
@@ -467,7 +467,7 @@ def get_income_by_month(user_id: int, month_name: str) -> list[dict]:
         end_date = f"{year}-{month_num + 1:02d}-01"
 
     return _execute_dict(
-        """SELECT id, amount, source, date, description, created_at
+        """SELECT id, amount, source, date, description, category, created_at
            FROM income WHERE user_id = %s AND date >= %s AND date < %s
            ORDER BY date, created_at""",
         (user_id, start_date, end_date),
