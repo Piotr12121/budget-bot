@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from bot.services import sheets, storage, database
 from bot.utils.formatting import build_preview_text, build_save_confirmation
-from bot.categories import CATEGORIES, CATEGORY_NAMES, CATEGORY_EMOJIS
+from bot.categories import CATEGORIES, CATEGORY_NAMES, CATEGORY_EMOJIS, INCOME_CATEGORIES, INCOME_CATEGORY_EMOJIS
 from bot.config import MONTHS_MAPPING
 from bot.i18n import t, set_lang
 
@@ -109,6 +109,72 @@ def _build_subcategory_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+async def _handle_income_callback(query, parts: list[str]) -> None:
+    """Handle income_cat and income_cancel callbacks."""
+    action = parts[0]
+    income_id = parts[1]
+
+    if action == "income_cancel":
+        pending = storage.pop_pending_income(income_id)
+        if pending is None:
+            await query.edit_message_text(t("expense_expired"))
+            return
+        if query.from_user.id != pending["user_id"]:
+            await query.answer(t("not_your_expense"), show_alert=True)
+            return
+        await query.edit_message_text(t("income_cancelled"))
+        return
+
+    # income_cat:{income_id}:{category_idx}
+    cat_idx = int(parts[2])
+    category = INCOME_CATEGORIES[cat_idx]
+
+    pending = storage.pop_pending_income(income_id)
+    if pending is None:
+        await query.edit_message_text(t("expense_expired"))
+        return
+    if query.from_user.id != pending["user_id"]:
+        await query.answer(t("not_your_expense"), show_alert=True)
+        return
+
+    try:
+        user_db_id = database.get_or_create_user(
+            pending["user_id"],
+            query.from_user.full_name,
+        )
+        database.save_income(
+            user_db_id,
+            pending["amount"],
+            pending["source"],
+            pending["date"],
+            pending["source"],
+            category,
+        )
+
+        # Sync to Sheets (best-effort)
+        try:
+            sheets.save_income_to_sheet({
+                "date": pending["date"],
+                "amount": pending["amount"],
+                "category": category,
+                "source": pending["source"],
+            })
+        except Exception:
+            logger.warning("Income Sheets sync failed")
+
+        emoji = INCOME_CATEGORY_EMOJIS.get(category, "💰")
+        await query.edit_message_text(
+            t("income_category_selected",
+              amount=f"{pending['amount']:.0f}",
+              category=f"{emoji} {category}",
+              source=pending["source"]),
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+        logger.error(f"Error saving income: {e}")
+        await query.edit_message_text(t("income_error"))
+
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -116,6 +182,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     callback_data = query.data
     parts = callback_data.split(":")
     action = parts[0]
+
+    # Income callbacks
+    if action in ("income_cat", "income_cancel"):
+        await _handle_income_callback(query, parts)
+        return
 
     # Language switch
     if action == "lang":

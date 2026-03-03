@@ -26,6 +26,7 @@ def create_app():
     application.add_handler(CommandHandler("chart", commands.chart_cmd))
     application.add_handler(CommandHandler("recurring", commands.recurring_cmd))
     application.add_handler(CommandHandler("balance", commands.balance_cmd))
+    application.add_handler(CommandHandler("incomes", commands.incomes_cmd))
     application.add_handler(CommandHandler("search", commands.search_cmd))
     application.add_handler(CommandHandler("last", commands.last_cmd))
     application.add_handler(CommandHandler("expenses", commands.expenses_cmd))

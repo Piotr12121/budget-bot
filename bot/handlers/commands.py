@@ -8,7 +8,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 from bot.config import MONTHS_MAPPING, MONTH_NAME_TO_NUM
-from bot.categories import CATEGORIES_DISPLAY, CATEGORY_EMOJIS
+from bot.categories import CATEGORIES_DISPLAY, CATEGORY_EMOJIS, INCOME_CATEGORY_EMOJIS
 from bot.services import sheets, storage, database
 from bot.utils.auth import authorized
 from bot.i18n import t, set_lang
@@ -567,6 +567,41 @@ async def balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "",
         t("balance_net", net=net),
     ]
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+@authorized
+async def incomes_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show income entries for current month grouped by category."""
+    if not database.is_available():
+        await update.message.reply_text(t("db_required"))
+        return
+
+    user_db_id = database.get_or_create_user(update.effective_user.id)
+    month_name = MONTHS_MAPPING[datetime.now().month]
+
+    income_items = database.get_income_by_month(user_db_id, month_name)
+    if not income_items:
+        await update.message.reply_text(
+            t("income_list_empty", month=month_name), parse_mode="Markdown"
+        )
+        return
+
+    lines = [t("income_list_title", month=month_name)]
+    total = 0.0
+    for item in income_items:
+        amount = float(item["amount"])
+        total += amount
+        category = item.get("category") or "—"
+        emoji = INCOME_CATEGORY_EMOJIS.get(category, "💰")
+        lines.append(t("income_list_item",
+                       emoji=emoji,
+                       category=category,
+                       amount=amount,
+                       source=item["source"]))
+    lines.append("")
+    lines.append(t("income_list_total", total=total))
+
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 

@@ -5,18 +5,36 @@ import logging
 import re
 import uuid
 from datetime import datetime
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 from bot.services import ai_parser, storage, database
 from bot.utils.auth import authorized
 from bot.utils.formatting import build_preview_text
 from bot.handlers.callbacks import _build_confirmation_keyboard
+from bot.categories import INCOME_CATEGORIES, INCOME_CATEGORY_EMOJIS
 from bot.i18n import t
 
 logger = logging.getLogger(__name__)
 
 _INCOME_PATTERN = re.compile(r"^\+(\d+(?:[.,]\d+)?)\s+(.+)$")
+
+
+def _build_income_category_keyboard(income_id: str) -> InlineKeyboardMarkup:
+    """Build inline keyboard for income category selection."""
+    rows = []
+    for i, cat in enumerate(INCOME_CATEGORIES):
+        emoji = INCOME_CATEGORY_EMOJIS.get(cat, "💰")
+        rows.append([
+            InlineKeyboardButton(
+                f"{emoji} {cat}",
+                callback_data=f"income_cat:{income_id}:{i}",
+            )
+        ])
+    rows.append([
+        InlineKeyboardButton("❌ " + t("btn_cancel"), callback_data=f"income_cancel:{income_id}"),
+    ])
+    return InlineKeyboardMarkup(rows)
 
 
 @authorized
@@ -75,20 +93,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def _handle_income(update: Update, match: re.Match):
-    """Handle income entry like +5000 wyplata."""
+    """Handle income entry like +5000 wyplata — shows category selection keyboard."""
     try:
         amount = float(match.group(1).replace(",", "."))
         source = match.group(2).strip()
-        user_db_id = database.get_or_create_user(
-            update.effective_user.id, update.effective_user.full_name
-        )
         today = datetime.now().strftime("%Y-%m-%d")
-        database.save_income(user_db_id, amount, source, today, source)
 
+        income_id = str(uuid.uuid4())
+        storage.save_pending_income(income_id, {
+            "user_id": update.effective_user.id,
+            "amount": amount,
+            "source": source,
+            "date": today,
+        })
+
+        keyboard = _build_income_category_keyboard(income_id)
         await update.message.reply_text(
-            t("income_saved", amount=f"{amount:.0f}", source=source),
+            t("income_choose_category", amount=f"{amount:.0f}", source=source),
+            reply_markup=keyboard,
             parse_mode="Markdown",
         )
     except Exception as e:
-        logger.error(f"Error saving income: {e}")
+        logger.error(f"Error handling income: {e}")
         await update.message.reply_text(t("income_error"))
