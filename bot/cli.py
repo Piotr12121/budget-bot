@@ -3,10 +3,13 @@
 import argparse
 import csv
 import json as _json
+import logging
 import re
 import sys
 from datetime import datetime, date, timedelta
 from io import StringIO
+
+logger = logging.getLogger(__name__)
 
 from rich.columns import Columns
 from rich.console import Console
@@ -16,7 +19,7 @@ from rich.tree import Tree
 from rich import box
 
 from bot.config import ALLOWED_USER_ID, MONTHS_MAPPING, MONTH_NAME_TO_NUM
-from bot.categories import CATEGORIES, CATEGORIES_DISPLAY, CATEGORY_EMOJIS
+from bot.categories import CATEGORIES, CATEGORIES_DISPLAY, CATEGORY_EMOJIS, INCOME_CATEGORIES, INCOME_CATEGORY_EMOJIS
 from bot.i18n import t, set_lang
 
 console = Console()
@@ -293,25 +296,112 @@ def cmd_add(args):
 def cmd_income(args):
     """Add income entry."""
     _require_db()
-    from bot.services import database
+    from bot.services import database, sheets
 
     user_db_id = _get_user_id()
     today = datetime.now().strftime("%Y-%m-%d")
     source = " ".join(args.source)
+    category = args.category
+
+    if not category:
+        console.print("\n[bold]Wybierz kategorię przychodu:[/bold]")
+        for i, cat in enumerate(INCOME_CATEGORIES, 1):
+            emoji = INCOME_CATEGORY_EMOJIS.get(cat, "💰")
+            console.print(f"  {i}. {emoji} {cat}")
+        try:
+            choice = int(console.input("\nNumer kategorii: ").strip()) - 1
+            if 0 <= choice < len(INCOME_CATEGORIES):
+                category = INCOME_CATEGORIES[choice]
+            else:
+                console.print("[red]Nieprawidłowy numer kategorii.[/red]")
+                return 1
+        except (ValueError, KeyboardInterrupt):
+            console.print("[red]Anulowano.[/red]")
+            return 1
 
     try:
-        database.save_income(user_db_id, args.amount, source, today, source)
-        msg = _strip_markdown(t("income_saved", amount=f"{args.amount:.0f}", source=source))
+        database.save_income(user_db_id, args.amount, source, today, source, category)
+
+        # Sync to Sheets (best-effort)
+        try:
+            sheets.save_income_to_sheet({
+                "date": today,
+                "amount": args.amount,
+                "category": category,
+                "source": source,
+            })
+        except Exception as e:
+            logger.warning(f"Income Sheets sync failed: {e}")
+
+        emoji = INCOME_CATEGORY_EMOJIS.get(category, "💰")
         if _json_mode(args):
-            print(_json.dumps({"status": "ok", "message": msg}, ensure_ascii=False))
+            print(_json.dumps({
+                "status": "ok",
+                "amount": args.amount,
+                "source": source,
+                "category": category,
+            }, ensure_ascii=False))
         else:
-            console.print(f"[bold green]{msg}[/bold green]")
+            console.print(f"[bold green]✅ Zapisano przychód: {args.amount:.0f} PLN — {source}[/bold green]")
+            console.print(f"   Kategoria: {emoji} {category}")
     except Exception as e:
         if _json_mode(args):
             print(_json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False))
         else:
             console.print(f"[bold red]Error:[/bold red] {e}")
         return 1
+    return 0
+
+
+def cmd_incomes(args):
+    """Show income list for current (or given) month."""
+    _require_db()
+    from bot.services import database
+
+    user_db_id = _get_user_id()
+    target_month = _resolve_month(args.month) if hasattr(args, "month") and args.month else MONTHS_MAPPING[datetime.now().month]
+
+    income_items = database.get_income_by_month(user_db_id, target_month)
+
+    if _json_mode(args):
+        data = [
+            {
+                "id": item["id"],
+                "amount": float(item["amount"]),
+                "source": item["source"],
+                "category": item.get("category"),
+                "date": str(item["date"]),
+            }
+            for item in income_items
+        ]
+        print(_json.dumps({"month": target_month, "income": data}, ensure_ascii=False, indent=2))
+        return 0
+
+    if not income_items:
+        console.print(f"Brak przychodów za: {target_month}.")
+        return 0
+
+    table = Table(title=f"Przychody: {target_month}", border_style="blue")
+    table.add_column("Data", style="dim", width=12)
+    table.add_column("Kategoria", style="cyan")
+    table.add_column("Kwota (PLN)", justify="right", style="green")
+    table.add_column("Źródło")
+
+    total = 0.0
+    for item in income_items:
+        amount = float(item["amount"])
+        total += amount
+        category = item.get("category") or "—"
+        emoji = INCOME_CATEGORY_EMOJIS.get(category, "💰")
+        table.add_row(
+            str(item["date"]),
+            f"{emoji} {category}",
+            f"{amount:.2f}",
+            item["source"],
+        )
+
+    console.print(table)
+    console.print(f"\n[bold green]Razem: {total:.2f} PLN[/bold green]")
     return 0
 
 
@@ -1335,6 +1425,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("income", help="Add income")
     p.add_argument("amount", type=float, help="Income amount")
     p.add_argument("source", nargs="+", help="Income source description")
+    p.add_argument("-c", "--category", choices=INCOME_CATEGORIES, default=None,
+                   metavar="CATEGORY", help=f"Income category ({', '.join(INCOME_CATEGORIES)})")
+
+    # incomes
+    p = sub.add_parser("incomes", help="Show income list for current month")
+    p.add_argument("month", nargs="?", default=None, help="Month name or number (default: current)")
 
     # summary
     p = sub.add_parser("summary", help="Monthly summary by category")
@@ -1446,6 +1542,7 @@ def build_parser() -> argparse.ArgumentParser:
 COMMAND_MAP = {
     "add": cmd_add,
     "income": cmd_income,
+    "incomes": cmd_incomes,
     "summary": cmd_summary,
     "last": cmd_last,
     "search": cmd_search,

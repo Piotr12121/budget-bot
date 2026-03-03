@@ -28,6 +28,7 @@ STRINGS = {
         "/recurring `list` — show recurring expenses\n"
         "/recurring `remove <id>` — remove recurring\n"
         "/balance — income vs expenses (current month)\n"
+        "/incomes — list income entries for current month\n"
         "/search `<query>` — search expenses\n"
         "/last `[N]` — last N expenses (default: 10)\n"
         "/expenses `<start> <end>` — expenses by date range\n"
@@ -123,6 +124,13 @@ STRINGS = {
     # Income
     "income_saved": "💵 Income saved: *{amount} PLN* — {source}",
     "income_error": "❌ Error saving income.",
+    "income_choose_category": "💵 Income *{amount} PLN* — {source}\n\nChoose a category:",
+    "income_category_selected": "✅ Income saved: *{amount} PLN*\nCategory: {category}\nSource: {source}",
+    "income_cancelled": "❌ Income entry cancelled.",
+    "income_list_title": "💵 *Income: {month}*\n",
+    "income_list_item": "• {emoji} *{category}*: {amount:.2f} PLN — {source}",
+    "income_list_total": "💰 *Total: {total:.2f} PLN*",
+    "income_list_empty": "💵 No income for: *{month}*.",
     "balance_title": "💰 *Balance: {month}*\n",
     "balance_income": "💵 Income: *{income:.2f} PLN*",
     "balance_expenses": "💸 Expenses: *{expenses:.2f} PLN*",

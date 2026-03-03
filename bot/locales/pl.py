@@ -28,6 +28,7 @@ STRINGS = {
         "/recurring `list` — pokaż wydatki cykliczne\n"
         "/recurring `remove <id>` — usuń cykliczny\n"
         "/balance — bilans przychody/wydatki (bieżący miesiąc)\n"
+        "/incomes — lista przychodów bieżącego miesiąca\n"
         "/search `<fraza>` — szukaj wydatków\n"
         "/last `[N]` — ostatnie N wydatków (domyślnie: 10)\n"
         "/expenses `<start> <koniec>` — wydatki w zakresie dat\n"
@@ -123,6 +124,13 @@ STRINGS = {
     # Income
     "income_saved": "💵 Zapisano przychód: *{amount} PLN* — {source}",
     "income_error": "❌ Błąd zapisywania przychodu.",
+    "income_choose_category": "💵 Przychód *{amount} PLN* — {source}\n\nWybierz kategorię:",
+    "income_category_selected": "✅ Zapisano przychód: *{amount} PLN*\nKategoria: {category}\nŹródło: {source}",
+    "income_cancelled": "❌ Anulowano zapis przychodu.",
+    "income_list_title": "💵 *Przychody: {month}*\n",
+    "income_list_item": "• {emoji} *{category}*: {amount:.2f} PLN — {source}",
+    "income_list_total": "💰 *Razem: {total:.2f} PLN*",
+    "income_list_empty": "💵 Brak przychodów za: *{month}*.",
     "balance_title": "💰 *Bilans: {month}*\n",
     "balance_income": "💵 Przychody: *{income:.2f} PLN*",
     "balance_expenses": "💸 Wydatki: *{expenses:.2f} PLN*",

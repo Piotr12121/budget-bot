@@ -627,18 +627,24 @@ class TestCmdSync:
 
 
 class TestCmdIncome:
+    @patch("bot.services.sheets.save_income_to_sheet")
     @patch("bot.services.database.is_available", return_value=True)
     @patch("bot.services.database.get_or_create_user", return_value=1)
     @patch("bot.services.database.save_income", return_value=1)
-    def test_income_saved(self, mock_save, mock_user, mock_avail, capsys):
+    def test_income_saved(self, mock_save, mock_user, mock_avail, mock_sheets, capsys):
         parser = build_parser()
-        args = parser.parse_args(["income", "5000", "wyplata"])
+        args = parser.parse_args(["income", "5000", "wyplata", "--category", "Wynagrodzenie"])
         result = cmd_income(args)
 
         assert result == 0
         out = capsys.readouterr().out
         assert "5000" in out
         assert "wyplata" in out
+        mock_save.assert_called_once()
+        _, kwargs = mock_save.call_args
+        # category is passed as positional arg
+        call_args = mock_save.call_args[0]
+        assert "Wynagrodzenie" in call_args
 
 
 class TestCmdBalance:
